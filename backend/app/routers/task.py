@@ -23,11 +23,24 @@ def list_entries(
     page: int = 1,
     size: int = 20,
 ) -> PageResult[dict]:
-    """按任务编号与状态过滤检测任务列表；没有数据时返回空页，不报错。"""
+    """按派发顺序返回检测任务：优先级高的在前，同优先级内超期任务排在普通任务之前。"""
     if size > 200:
         raise HTTPException(status_code=400, detail="每页最多 200 条，请缩小分页范围")
     items, total = service.list_entries(keyword=keyword, status=status, page=page, size=size)
     return PageResult(items=items, total=total, page=page, size=size)
+
+
+@router.get("/assignees")
+def list_assignees() -> dict[str, Any]:
+    """承检人员档案：姓名、资质与当前在手任务数，供派发前选择。"""
+    return {"items": service.list_assignees()}
+
+
+@router.get("/export")
+def export_entries() -> dict[str, Any]:
+    """导出检测任务清单：按派发顺序返回全量数据。"""
+    items, total = service.list_entries(page=1, size=10000)
+    return {"module": "task", "total": total, "items": items}
 
 
 @router.get("/{entry_id}", response_model=dict)
@@ -50,16 +63,9 @@ def create_entry(payload: EntryPayload) -> ActionResult:
 
 @router.post("/{entry_id}/actions", response_model=ActionResult)
 def run_action(entry_id: int, payload: EntryPayload) -> ActionResult:
-    """对单条检测任务执行派发任务、提交复核、确认完成；不允许的动作会被拦下并说明原因。"""
+    """对单条检测任务执行动作；派发需带承检人员，超上限、资质不匹配或重复派发会被拦下并说明原因。"""
     action = str(payload.values.get("action") or "").strip()
-    entry, message = service.run_action(entry_id, action)
+    entry, message = service.run_action(entry_id, action, payload.values)
     if entry is None:
         return ActionResult(ok=False, message=message)
     return ActionResult(ok=True, message=message, entry=entry)
-
-
-@router.get("/export")
-def export_entries() -> dict[str, Any]:
-    """导出检测任务清单：返回当前过滤条件下的全量数据。"""
-    items, total = service.list_entries(page=1, size=10000)
-    return {"module": "task", "total": total, "items": items}
