@@ -13,7 +13,12 @@
         <span class="head-desc">面向样品受理、任务派发、检测执行、仪器校准与报告出具的一体化实验室检测管理后台。</span>
         <span class="head-user">当前值班：{{ store.operator }} · {{ store.shiftLabel }}</span>
       </header>
-      <RouterView />
+      <RouterView v-slot="{ Component }">
+        <!-- 检测任务页缓存：刷新由后端排序/超期口径兜底，从复核页等路由返回时保留列表现场 -->
+        <KeepAlive :include="['TaskView']">
+          <component :is="Component" />
+        </KeepAlive>
+      </RouterView>
     </main>
   </div>
 </template>
